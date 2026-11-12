@@ -16,18 +16,34 @@
         
         /* Bảng điều khiển */
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-        .tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1; }
+        .tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 5px; }
         .tab-btn { background: #eef2f7; border: 1px solid #ccc; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; }
         .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
-        .action-btns button { background: var(--secondary); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; margin-left: 5px; }
+        .action-btns button { background: var(--secondary); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; margin-left: 5px; margin-bottom: 5px; }
         
         /* Thống kê & Timer */
         .dashboard { display: flex; gap: 10px; margin-bottom: 20px; }
         .stat-card { flex: 1; background: #fafafa; border: 1px solid #ddd; padding: 10px; text-align: center; border-radius: 6px; }
         .stat-card h3 { margin: 0; font-size: 18px; color: var(--primary); }
         .stat-card p { margin: 5px 0 0; font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; }
-        #timer-box { display: none; background: #fff3e0; border-color: #ff9800; }
-        #timer-box h3 { color: #e65100; font-size: 24px; }
+        
+        /* Đồng hồ đếm ngược nổi trên màn hình */
+        #timer-box { 
+            display: none; 
+            background: #fff3e0; 
+            border: 2px solid #ff9800;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            width: 150px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 15px 10px;
+            text-align: center;
+        }
+        #timer-box h3 { color: #e65100; font-size: 28px; margin: 0; }
+        #timer-box p { margin: 5px 0 0; font-size: 12px; font-weight: bold; color: #555; text-transform: uppercase; }
         
         /* Câu hỏi */
         .q-box { padding: 20px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 20px; background: #fdfdfd; }
@@ -35,10 +51,9 @@
         .opt-label { display: block; padding: 12px 15px; margin: 8px 0; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; transition: 0.2s; background: #fff; }
         .opt-label:hover { background: #f0f4f8; }
         
-        /* Trạng thái đáp án (Chế độ học) */
+        /* Trạng thái đáp án */
         .opt-label.correct { background: #e8f5e9; border-color: var(--correct); color: var(--correct); font-weight: bold; }
         .opt-label.incorrect { background: #ffebee; border-color: var(--incorrect); color: var(--incorrect); }
-        /* Trạng thái đáp án (Chế độ thi) */
         .opt-label.selected { background: #e1f5fe; border-color: var(--selected); color: var(--selected); font-weight: bold; }
         
         .explanation { margin-top: 15px; padding: 12px; background: #fffde7; border-left: 4px solid #fbc02d; font-size: 13.5px; display: none; line-height: 1.5; }
@@ -51,7 +66,7 @@
         .nav-btn.nav-incorrect { background: #ffcdd2; color: var(--incorrect); }
         .nav-btn.nav-selected { background: #81d4fa; color: #01579b; }
 
-        .loader { text-align: center; padding: 50px; font-weight: bold; color: var(--primary); }
+        .loader { text-align: center; padding: 50px; font-weight: bold; color: var(--primary); font-size: 16px; }
     </style>
 </head>
 <body>
@@ -68,14 +83,17 @@
             <button onclick="fetchData(true)">🔄 Đồng bộ Sheet</button>
             <button onclick="startMockExam()" id="btn-exam" style="background: #e65100;">⏱ Thi thử</button>
             <button onclick="submitExam()" id="btn-submit" style="display: none; background: #2e7d32;">✅ Nộp bài</button>
+            <button onclick="resetProgress()" style="background: #d32f2f;">🗑 Làm lại từ đầu</button>
         </div>
     </div>
 
+    <!-- Đồng hồ ghim nổi -->
+    <div id="timer-box">
+        <h3 id="timer-text">00:00</h3>
+        <p>Thời gian còn lại</p>
+    </div>
+
     <div class="dashboard">
-        <div class="stat-card" id="timer-box">
-            <h3 id="timer-text">00:00</h3>
-            <p>Thời gian còn lại</p>
-        </div>
         <div class="stat-card">
             <h3 id="stat-total">0</h3>
             <p>Tổng số câu</p>
@@ -109,7 +127,7 @@
 </div>
 
 <script>
-    // ⚠️ THAY BẰNG URL BẠN LẤY TỪ BƯỚC 1 CỦA GAS
+    // URL Lấy dữ liệu từ Google Apps Script của bạn
     const API_URL = 'https://script.google.com/macros/s/AKfycbwjiLu4ck3TnLPttraO5ZsOH9euoIX6Vil5b4YISNmxmEKUOfd82jiLh_Qb47BtaQJ9Cg/exec';
     
     // Ánh xạ đáp án từ A, B, C, D sang index 0, 1, 2, 3
@@ -125,7 +143,6 @@
     let examTimeLeft = 0;
 
     // LOCAL STORAGE: Lưu trữ tiến trình
-    // Cấu trúc: { "Xe cơ giới": { "1": 2, "2": 0... }, "Hàng hải": {...} }
     let userProgress = JSON.parse(localStorage.getItem('bic_progress')) || {};
 
     // Khởi chạy khi load trang
@@ -148,7 +165,7 @@
             initUI();
             if(forceSync) alert("Đã cập nhật dữ liệu mới nhất từ Google Sheets!");
         } catch (err) {
-            document.getElementById('content-container').innerHTML = '<div class="loader" style="color:red;">Lỗi kết nối đến Google Sheets.</div>';
+            document.getElementById('content-container').innerHTML = '<div class="loader" style="color:red;">Lỗi kết nối đến Google Sheets. Vui lòng kiểm tra quyền truy cập.</div>';
         }
     }
 
@@ -168,7 +185,7 @@
 
             if (firstTab) {
                 currentTopic = topic;
-                currentQuestions = [...dbData[topic]]; // Clone array
+                currentQuestions = [...dbData[topic]];
                 firstTab = false;
             }
         }
@@ -177,7 +194,7 @@
 
     function switchTab(topic, btnEl) {
         if(isMockExam) {
-            if(!confirm("Bạn đang trong chế độ thi thử. Chuyển Tab sẽ hủy kết quả thi. Tiếp tục?")) return;
+            if(!confirm("Bạn đang trong chế độ thi thử. Chuyển Tab sẽ hủy kết quả thi hiện tại. Tiếp tục?")) return;
             endMockExam(false); 
         }
 
@@ -209,7 +226,6 @@
 
             q.options.forEach((opt, optIdx) => {
                 let letter = String.fromCharCode(65 + optIdx);
-                // Xác định class css dựa trên kết quả cũ (nếu có)
                 let cls = '';
                 let disabled = '';
                 let icon = '';
@@ -219,7 +235,7 @@
                     if (optIdx === correctIdx) { cls = 'correct'; icon = ' ✔'; }
                     else if (optIdx === userAns) { cls = 'incorrect'; icon = ' ✖'; }
                 } else if (isMockExam && userAns === optIdx) {
-                    cls = 'selected'; // Chế độ thi chỉ hiện màu đã chọn
+                    cls = 'selected';
                 }
 
                 html += `
@@ -336,17 +352,16 @@
 
     function submitExam() {
         clearInterval(timerInterval);
-        isMockExam = false; // Tắt cờ thi thử để chuyển sang cơ chế chấm
+        isMockExam = false; 
         
         document.getElementById('timer-box').style.display = 'none';
         document.getElementById('btn-exam').style.display = 'inline-block';
         document.getElementById('btn-submit').style.display = 'none';
         
         alert("Nộp bài thành công! Hệ thống sẽ tự động chấm điểm.");
-        // Lưu tiến trình bài thi vào máy
         localStorage.setItem('bic_progress', JSON.stringify(userProgress));
-        renderQuiz(); // Render lại với isMockExam = false để hiện đúng/sai và giải thích
-        window.scrollTo(0,0);
+        renderQuiz(); 
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function endMockExam(save) {
@@ -369,9 +384,10 @@
             userProgress[currentTopic] = {};
             localStorage.setItem('bic_progress', JSON.stringify(userProgress));
             
-            // Xếp lại thứ tự gốc
+            // Xếp lại thứ tự gốc từ cơ sở dữ liệu
             currentQuestions = [...dbData[currentTopic]];
             renderQuiz();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }
 </script>
