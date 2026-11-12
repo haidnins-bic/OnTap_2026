@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ôn Tập Nghiệp Vụ Bảo Hiểm 2026</title>
+    <title>Cổng Ôn Tập Nghiệp Vụ Bảo Hiểm BIC</title>
     <style>
         :root {
             --primary: #003366; --secondary: #004080; --bg: #f4f6f9;
@@ -11,18 +11,18 @@
         }
         body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background: var(--bg); color: #333; }
         .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: var(--primary); text-align: center; margin-bottom: 5px; font-size: 22px; }
+        h1 { color: var(--primary); text-align: center; margin-bottom: 5px; font-size: 22px; text-transform: uppercase; }
         .sub-title { text-align: center; color: #666; font-size: 13px; margin-bottom: 20px; }
         
-      /* --- KHU VỰC NÚT CHỨC NĂNG --- */
+        /* --- KHU VỰC NÚT CHỨC NĂNG --- */
         .top-actions { 
             display: flex; 
-            justify-content: flex-end; /* Đẩy các nút sang phải */
+            justify-content: flex-end; 
             gap: 12px; 
             margin-bottom: 20px; 
             flex-wrap: wrap;
         }
-        .top-actions button { 
+        .top-actions button, .quick-actions button { 
             background: var(--secondary); 
             color: #fff; 
             border: none; 
@@ -34,7 +34,9 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
             transition: all 0.2s;
         }
-        .top-actions button:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .top-actions button:hover, .quick-actions button:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        
+        .quick-actions { display: flex; gap: 10px; margin: 10px 0; }
 
         /* --- KHU VỰC TAB CHUYÊN ĐỀ (Dạng bìa hồ sơ) --- */
         .topic-tabs { 
@@ -42,9 +44,8 @@
             gap: 4px; 
             overflow-x: auto; 
             margin-bottom: 25px; 
-            border-bottom: 3px solid var(--primary); /* Đường viền chân kết nối các tab */
+            border-bottom: 3px solid var(--primary); 
         }
-        /* Làm đẹp thanh cuộn ngang của Tab */
         .topic-tabs::-webkit-scrollbar { height: 6px; }
         .topic-tabs::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         
@@ -52,7 +53,7 @@
             background: #e2e8f0; 
             border: none; 
             padding: 12px 20px; 
-            border-radius: 8px 8px 0 0; /* Bo tròn 2 góc trên giống bìa hồ sơ */
+            border-radius: 8px 8px 0 0; 
             cursor: pointer; 
             font-weight: bold; 
             font-size: 14px; 
@@ -117,7 +118,7 @@
 <body>
 
 <div class="container">
-    <h1>ÔN TẬP NGHIỆP VỤ BẢO HIỂM 2026</h1>
+    <h1>CỔNG ÔN TẬP NGHIỆP VỤ BẢO HIỂM - BIC</h1>
     <div class="sub-title">Hệ thống câu hỏi ôn tập nghiệp vụ nội bộ theo quy định & biểu phí hiện hành</div>
 
     <!-- TẦNG 1: CÁC NÚT CHỨC NĂNG ĐIỀU KHIỂN -->
@@ -164,8 +165,8 @@
 
     <div class="quick-nav">
         <b>BẢNG TRUY CẬP NHANH:</b>
-        <div class="action-btns" style="margin-top: 10px; margin-bottom: 10px;">
-            <button onclick="shuffleQuestions()" style="background: #607d8b;">🔀 Đảo câu hỏi</button>
+        <div class="quick-actions">
+            <button onclick="shuffleQuestions()" style="background: #607d8b;">🔀 Đảo thứ tự câu hỏi</button>
             <button onclick="resetProgress()" style="background: #d32f2f;">🗑 Làm lại từ đầu</button>
         </div>
         <div class="nav-grid" id="quick-grid"></div>
@@ -174,7 +175,7 @@
 
 <script>
     // URL Lấy dữ liệu từ Google Apps Script của bạn
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwjiLu4ck3TnLPttraO5ZsOH9euoIX6Vil5b4YISNmxmEKUOfd82jiLh_Qb47BtaQJ9Cg/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwLFmc6fEmJppxxxdVKtg-txlZwYEnb8khk4fNi_9v6xTlrErjXzxbQqa74rs2RS2VF0A/exec';
     
     // Ánh xạ đáp án từ A, B, C, D sang index 0, 1, 2, 3
     const mapAns = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
@@ -188,8 +189,8 @@
     let timerInterval = null;
     let examTimeLeft = 0;
 
-    // LOCAL STORAGE: Lưu trữ tiến trình
-    let userProgress = JSON.parse(localStorage.getItem('bic_sg_progress')) || {};
+    // LOCAL STORAGE: Lưu trữ tiến trình bằng tên gốc (bic_progress)
+    let userProgress = JSON.parse(localStorage.getItem('bic_progress')) || {};
 
     // Khởi chạy khi load trang
     window.onload = () => { fetchData(false); };
@@ -197,9 +198,8 @@
     async function fetchData(forceSync) {
         document.getElementById('content-container').innerHTML = '<div class="loader" id="loader">Đang tải dữ liệu từ Google Sheets...</div>';
         
-        // Nếu không ép đồng bộ (forceSync) và có sẵn trong Local Storage thì dùng luôn cho nhanh
-        if (!forceSync && localStorage.getItem('bic_sg_db')) {
-            dbData = JSON.parse(localStorage.getItem('bic_sg_db'));
+        if (!forceSync && localStorage.getItem('bic_db')) {
+            dbData = JSON.parse(localStorage.getItem('bic_db'));
             initUI();
             return;
         }
@@ -207,7 +207,7 @@
         try {
             const response = await fetch(API_URL);
             dbData = await response.json();
-            localStorage.setItem('bic_sg_db', JSON.stringify(dbData)); // Caching
+            localStorage.setItem('bic_db', JSON.stringify(dbData)); 
             initUI();
             if(forceSync) alert("Đã cập nhật dữ liệu mới nhất từ Google Sheets!");
         } catch (err) {
@@ -221,7 +221,19 @@
         let firstTab = true;
 
         for (let topic in dbData) {
-            if (!userProgress[topic]) userProgress[topic] = {}; // Khởi tạo progress cho sheet mới
+            if (!userProgress[topic]) userProgress[topic] = {}; 
+
+            // THUẬT TOÁN XÁO TRỘN ĐÁP ÁN ĐỘC LẬP TỪNG CÂU HỎI
+            dbData[topic].forEach(q => {
+                let opts = q.options.map((text, i) => ({text: text, originalIdx: i}));
+                // Thuật toán Fisher-Yates xáo trộn
+                for (let i = opts.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [opts[i], opts[j]] = [opts[j], opts[i]];
+                }
+                q.shuffledOptions = opts;
+                q.correctIdx = mapAns[q.correct];
+            });
 
             const btn = document.createElement('button');
             btn.className = `tab-btn ${firstTab ? 'active' : ''}`;
@@ -268,26 +280,30 @@
             `;
             
             let userAns = userProgress[currentTopic]?.[q.id];
-            let correctIdx = mapAns[q.correct];
+            let correctIdx = q.correctIdx;
 
-            q.options.forEach((opt, optIdx) => {
-                let letter = String.fromCharCode(65 + optIdx);
+            // Render Đáp án dựa trên mảng đã xáo trộn
+            q.shuffledOptions.forEach((optObj, displayIdx) => {
+                let letter = String.fromCharCode(65 + displayIdx); // Hiện A, B, C, D theo thứ tự hiển thị
+                let originalIdx = optObj.originalIdx;
+                let optText = optObj.text;
+                
                 let cls = '';
                 let disabled = '';
                 let icon = '';
                 
                 if (!isMockExam && userAns !== undefined) {
                     disabled = 'disabled';
-                    if (optIdx === correctIdx) { cls = 'correct'; icon = ' ✔'; }
-                    else if (optIdx === userAns) { cls = 'incorrect'; icon = ' ✖'; }
-                } else if (isMockExam && userAns === optIdx) {
+                    if (originalIdx === correctIdx) { cls = 'correct'; icon = ' ✔'; }
+                    else if (originalIdx === userAns) { cls = 'incorrect'; icon = ' ✖'; }
+                } else if (isMockExam && userAns === originalIdx) {
                     cls = 'selected';
                 }
 
                 html += `
-                    <label class="opt-label ${cls}" id="lbl-${q.id}-${optIdx}">
-                        <input type="radio" name="q_${q.id}" ${disabled} ${userAns === optIdx ? 'checked' : ''} onclick="selectOption('${q.id}', ${optIdx}, ${correctIdx})"> 
-                        <b>${letter}.</b> ${opt}${icon}
+                    <label class="opt-label ${cls}" id="lbl-${q.id}-${originalIdx}">
+                        <input type="radio" name="q_${q.id}" ${disabled} ${userAns === originalIdx ? 'checked' : ''} onclick="selectOption('${q.id}', ${originalIdx}, ${correctIdx})"> 
+                        <b>${letter}.</b> ${optText}${icon}
                     </label>
                 `;
             });
@@ -310,27 +326,28 @@
 
     function selectOption(qId, selectedIdx, correctIdx) {
         if (!userProgress[currentTopic]) userProgress[currentTopic] = {};
-        userProgress[currentTopic][qId] = selectedIdx; // Lưu lựa chọn
+        userProgress[currentTopic][qId] = selectedIdx; 
 
         if (isMockExam) {
             // Chế độ thi thử: Đánh dấu xanh lơ, không hiện đúng sai
             const qObj = currentQuestions.find(x => x.id == qId);
-            qObj.options.forEach((_, i) => document.getElementById(`lbl-${qId}-${i}`).className = 'opt-label');
+            qObj.shuffledOptions.forEach(optObj => document.getElementById(`lbl-${qId}-${optObj.originalIdx}`).className = 'opt-label');
             document.getElementById(`lbl-${qId}-${selectedIdx}`).classList.add('selected');
             document.getElementById(`nav-${qId}`).className = 'nav-btn nav-selected';
         } else {
-            // Chế độ ôn tập: Chấm ngay lập tức
-            localStorage.setItem('bic_sg_progress', JSON.stringify(userProgress)); // Lưu tiến trình
+            // Chế độ ôn tập: Chấm ngay lập tức và lưu vào biến gốc
+            localStorage.setItem('bic_progress', JSON.stringify(userProgress)); 
             
             const qObj = currentQuestions.find(x => x.id == qId);
             
             // Khóa các ô chọn & tô màu
-            qObj.options.forEach((_, i) => {
-                const lbl = document.getElementById(`lbl-${qId}-${i}`);
+            qObj.shuffledOptions.forEach(optObj => {
+                let originalIdx = optObj.originalIdx;
+                const lbl = document.getElementById(`lbl-${qId}-${originalIdx}`);
                 lbl.querySelector('input').disabled = true;
-                lbl.className = 'opt-label'; // reset
-                if (i === correctIdx) lbl.classList.add('correct');
-                else if (i === selectedIdx) lbl.classList.add('incorrect');
+                lbl.className = 'opt-label'; 
+                if (originalIdx === correctIdx) lbl.classList.add('correct');
+                else if (originalIdx === selectedIdx) lbl.classList.add('incorrect');
             });
 
             document.getElementById(`exp-${qId}`).style.display = 'block';
@@ -347,7 +364,7 @@
         currentQuestions.forEach(q => {
             let uAns = userProgress[currentTopic]?.[q.id];
             if (uAns !== undefined) {
-                if (uAns === mapAns[q.correct]) correct++;
+                if (uAns === q.correctIdx) correct++;
                 else incorrect++;
             }
         });
@@ -405,7 +422,7 @@
         document.getElementById('btn-submit').style.display = 'none';
         
         alert("Nộp bài thành công! Hệ thống sẽ tự động chấm điểm.");
-        localStorage.setItem('bic_sg_progress', JSON.stringify(userProgress));
+        localStorage.setItem('bic_progress', JSON.stringify(userProgress));
         renderQuiz(); 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -428,7 +445,7 @@
     function resetProgress() {
         if(confirm("Bạn có chắc chắn muốn xóa toàn bộ kết quả đã làm của chuyên đề này?")) {
             userProgress[currentTopic] = {};
-            localStorage.setItem('bic_sg_progress', JSON.stringify(userProgress));
+            localStorage.setItem('bic_progress', JSON.stringify(userProgress));
             
             // Xếp lại thứ tự gốc từ cơ sở dữ liệu
             currentQuestions = [...dbData[currentTopic]];
