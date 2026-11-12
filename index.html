@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cổng Ôn Tập Nghiệp Vụ Bảo Hiểm BIC</title>
+    <style>
+        :root {
+            --primary: #003366; --secondary: #004080; --bg: #f4f6f9;
+            --correct: #2e7d32; --incorrect: #c62828; --selected: #0277bd;
+        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 15px; background: var(--bg); color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { color: var(--primary); text-align: center; margin-bottom: 5px; font-size: 22px; }
+        .sub-title { text-align: center; color: #666; font-size: 13px; margin-bottom: 20px; }
+        
+        /* Bảng điều khiển */
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .tabs { display: flex; gap: 8px; overflow-x: auto; flex: 1; }
+        .tab-btn { background: #eef2f7; border: 1px solid #ccc; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; }
+        .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .action-btns button { background: var(--secondary); color: #fff; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; margin-left: 5px; }
+        
+        /* Thống kê & Timer */
+        .dashboard { display: flex; gap: 10px; margin-bottom: 20px; }
+        .stat-card { flex: 1; background: #fafafa; border: 1px solid #ddd; padding: 10px; text-align: center; border-radius: 6px; }
+        .stat-card h3 { margin: 0; font-size: 18px; color: var(--primary); }
+        .stat-card p { margin: 5px 0 0; font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; }
+        #timer-box { display: none; background: #fff3e0; border-color: #ff9800; }
+        #timer-box h3 { color: #e65100; font-size: 24px; }
+        
+        /* Câu hỏi */
+        .q-box { padding: 20px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 20px; background: #fdfdfd; }
+        .q-title { color: var(--primary); font-weight: bold; margin-bottom: 12px; font-size: 15px; line-height: 1.5; }
+        .opt-label { display: block; padding: 12px 15px; margin: 8px 0; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; transition: 0.2s; background: #fff; }
+        .opt-label:hover { background: #f0f4f8; }
+        
+        /* Trạng thái đáp án (Chế độ học) */
+        .opt-label.correct { background: #e8f5e9; border-color: var(--correct); color: var(--correct); font-weight: bold; }
+        .opt-label.incorrect { background: #ffebee; border-color: var(--incorrect); color: var(--incorrect); }
+        /* Trạng thái đáp án (Chế độ thi) */
+        .opt-label.selected { background: #e1f5fe; border-color: var(--selected); color: var(--selected); font-weight: bold; }
+        
+        .explanation { margin-top: 15px; padding: 12px; background: #fffde7; border-left: 4px solid #fbc02d; font-size: 13.5px; display: none; line-height: 1.5; }
+        
+        /* Quick Nav */
+        .quick-nav { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+        .nav-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .nav-btn { width: 36px; height: 36px; background: #e2e8f0; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .nav-btn.nav-correct { background: #c8e6c9; color: var(--correct); }
+        .nav-btn.nav-incorrect { background: #ffcdd2; color: var(--incorrect); }
+        .nav-btn.nav-selected { background: #81d4fa; color: #01579b; }
+
+        .loader { text-align: center; padding: 50px; font-weight: bold; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>CỔNG ÔN TẬP NGHIỆP VỤ BẢO HIỂM - BIC</h1>
+    <div class="sub-title">Hệ thống câu hỏi ôn tập nghiệp vụ nội bộ theo quy định & biểu phí hiện hành</div>
+
+    <div class="controls">
+        <div class="tabs" id="tabs-container">
+            <!-- Tabs render tự động từ Google Sheet -->
+        </div>
+        <div class="action-btns">
+            <button onclick="fetchData(true)">🔄 Đồng bộ Sheet</button>
+            <button onclick="startMockExam()" id="btn-exam" style="background: #e65100;">⏱ Thi thử</button>
+            <button onclick="submitExam()" id="btn-submit" style="display: none; background: #2e7d32;">✅ Nộp bài</button>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="stat-card" id="timer-box">
+            <h3 id="timer-text">00:00</h3>
+            <p>Thời gian còn lại</p>
+        </div>
+        <div class="stat-card">
+            <h3 id="stat-total">0</h3>
+            <p>Tổng số câu</p>
+        </div>
+        <div class="stat-card">
+            <h3 id="stat-correct" style="color: var(--correct);">0</h3>
+            <p>Số câu đúng</p>
+        </div>
+        <div class="stat-card">
+            <h3 id="stat-incorrect" style="color: var(--incorrect);">0</h3>
+            <p>Số câu sai</p>
+        </div>
+        <div class="stat-card">
+            <h3 id="stat-score" style="color: var(--selected);">0.0</h3>
+            <p>Điểm số (Thang 10)</p>
+        </div>
+    </div>
+
+    <div id="content-container">
+        <div class="loader" id="loader">Đang tải dữ liệu từ Google Sheets, vui lòng đợi...</div>
+    </div>
+
+    <div class="quick-nav">
+        <b>BẢNG TRUY CẬP NHANH:</b>
+        <div class="action-btns" style="margin-top: 10px; margin-bottom: 10px;">
+            <button onclick="shuffleQuestions()" style="background: #607d8b;">🔀 Đảo câu hỏi</button>
+            <button onclick="resetProgress()" style="background: #d32f2f;">🗑 Làm lại từ đầu</button>
+        </div>
+        <div class="nav-grid" id="quick-grid"></div>
+    </div>
+</div>
+
+<script>
+    // ⚠️ THAY BẰNG URL BẠN LẤY TỪ BƯỚC 1 CỦA GAS
+    const API_URL = 'URL_GAS_CUA_BAN';
+    
+    // Ánh xạ đáp án từ A, B, C, D sang index 0, 1, 2, 3
+    const mapAns = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+    
+    let dbData = {}; 
+    let currentTopic = '';
+    let currentQuestions = [];
+    
+    // Biến trạng thái chế độ thi thử
+    let isMockExam = false;
+    let timerInterval = null;
+    let examTimeLeft = 0;
+
+    // LOCAL STORAGE: Lưu trữ tiến trình
+    // Cấu trúc: { "Xe cơ giới": { "1": 2, "2": 0... }, "Hàng hải": {...} }
+    let userProgress = JSON.parse(localStorage.getItem('bic_progress')) || {};
+
+    // Khởi chạy khi load trang
+    window.onload = () => { fetchData(false); };
+
+    async function fetchData(forceSync) {
+        document.getElementById('content-container').innerHTML = '<div class="loader" id="loader">Đang tải dữ liệu từ Google Sheets...</div>';
+        
+        // Nếu không ép đồng bộ (forceSync) và có sẵn trong Local Storage thì dùng luôn cho nhanh
+        if (!forceSync && localStorage.getItem('bic_db')) {
+            dbData = JSON.parse(localStorage.getItem('bic_db'));
+            initUI();
+            return;
+        }
+
+        try {
+            const response = await fetch(API_URL);
+            dbData = await response.json();
+            localStorage.setItem('bic_db', JSON.stringify(dbData)); // Caching
+            initUI();
+            if(forceSync) alert("Đã cập nhật dữ liệu mới nhất từ Google Sheets!");
+        } catch (err) {
+            document.getElementById('content-container').innerHTML = '<div class="loader" style="color:red;">Lỗi kết nối đến Google Sheets.</div>';
+        }
+    }
+
+    function initUI() {
+        const tabsContainer = document.getElementById('tabs-container');
+        tabsContainer.innerHTML = '';
+        let firstTab = true;
+
+        for (let topic in dbData) {
+            if (!userProgress[topic]) userProgress[topic] = {}; // Khởi tạo progress cho sheet mới
+
+            const btn = document.createElement('button');
+            btn.className = `tab-btn ${firstTab ? 'active' : ''}`;
+            btn.innerText = `${topic} (${dbData[topic].length} câu)`;
+            btn.onclick = () => switchTab(topic, btn);
+            tabsContainer.appendChild(btn);
+
+            if (firstTab) {
+                currentTopic = topic;
+                currentQuestions = [...dbData[topic]]; // Clone array
+                firstTab = false;
+            }
+        }
+        renderQuiz();
+    }
+
+    function switchTab(topic, btnEl) {
+        if(isMockExam) {
+            if(!confirm("Bạn đang trong chế độ thi thử. Chuyển Tab sẽ hủy kết quả thi. Tiếp tục?")) return;
+            endMockExam(false); 
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+        
+        currentTopic = topic;
+        currentQuestions = [...dbData[topic]];
+        renderQuiz();
+    }
+
+    function renderQuiz() {
+        const container = document.getElementById('content-container');
+        const grid = document.getElementById('quick-grid');
+        container.innerHTML = '';
+        grid.innerHTML = '';
+
+        document.getElementById('stat-total').innerText = currentQuestions.length;
+
+        currentQuestions.forEach((q, index) => {
+            // Render Câu hỏi
+            let html = `
+                <div class="q-box" id="q-${q.id}">
+                    <div class="q-title">Câu ${index + 1}: ${q.question}</div>
+            `;
+            
+            let userAns = userProgress[currentTopic]?.[q.id];
+            let correctIdx = mapAns[q.correct];
+
+            q.options.forEach((opt, optIdx) => {
+                let letter = String.fromCharCode(65 + optIdx);
+                // Xác định class css dựa trên kết quả cũ (nếu có)
+                let cls = '';
+                let disabled = '';
+                let icon = '';
+                
+                if (!isMockExam && userAns !== undefined) {
+                    disabled = 'disabled';
+                    if (optIdx === correctIdx) { cls = 'correct'; icon = ' ✔'; }
+                    else if (optIdx === userAns) { cls = 'incorrect'; icon = ' ✖'; }
+                } else if (isMockExam && userAns === optIdx) {
+                    cls = 'selected'; // Chế độ thi chỉ hiện màu đã chọn
+                }
+
+                html += `
+                    <label class="opt-label ${cls}" id="lbl-${q.id}-${optIdx}">
+                        <input type="radio" name="q_${q.id}" ${disabled} ${userAns === optIdx ? 'checked' : ''} onclick="selectOption('${q.id}', ${optIdx}, ${correctIdx})"> 
+                        <b>${letter}.</b> ${opt}${icon}
+                    </label>
+                `;
+            });
+
+            html += `<div class="explanation" id="exp-${q.id}" style="display: ${(!isMockExam && userAns !== undefined) ? 'block' : 'none'};"><b>💡 Căn cứ:</b> ${q.explanation}</div>`;
+            html += `</div>`;
+            container.innerHTML += html;
+
+            // Render Nav nhanh
+            let navCls = '';
+            if (userAns !== undefined) {
+                if (isMockExam) navCls = 'nav-selected';
+                else navCls = (userAns === correctIdx) ? 'nav-correct' : 'nav-incorrect';
+            }
+            grid.innerHTML += `<button class="nav-btn ${navCls}" id="nav-${q.id}" onclick="document.getElementById('q-${q.id}').scrollIntoView({behavior:'smooth'})">${index + 1}</button>`;
+        });
+
+        if(!isMockExam) updateStats();
+    }
+
+    function selectOption(qId, selectedIdx, correctIdx) {
+        if (!userProgress[currentTopic]) userProgress[currentTopic] = {};
+        userProgress[currentTopic][qId] = selectedIdx; // Lưu lựa chọn
+
+        if (isMockExam) {
+            // Chế độ thi thử: Đánh dấu xanh lơ, không hiện đúng sai
+            const qObj = currentQuestions.find(x => x.id == qId);
+            qObj.options.forEach((_, i) => document.getElementById(`lbl-${qId}-${i}`).className = 'opt-label');
+            document.getElementById(`lbl-${qId}-${selectedIdx}`).classList.add('selected');
+            document.getElementById(`nav-${qId}`).className = 'nav-btn nav-selected';
+        } else {
+            // Chế độ ôn tập: Chấm ngay lập tức
+            localStorage.setItem('bic_progress', JSON.stringify(userProgress)); // Lưu tiến trình
+            
+            const qObj = currentQuestions.find(x => x.id == qId);
+            
+            // Khóa các ô chọn & tô màu
+            qObj.options.forEach((_, i) => {
+                const lbl = document.getElementById(`lbl-${qId}-${i}`);
+                lbl.querySelector('input').disabled = true;
+                lbl.className = 'opt-label'; // reset
+                if (i === correctIdx) lbl.classList.add('correct');
+                else if (i === selectedIdx) lbl.classList.add('incorrect');
+            });
+
+            document.getElementById(`exp-${qId}`).style.display = 'block';
+            
+            const nav = document.getElementById(`nav-${qId}`);
+            nav.className = `nav-btn ${selectedIdx === correctIdx ? 'nav-correct' : 'nav-incorrect'}`;
+            
+            updateStats();
+        }
+    }
+
+    function updateStats() {
+        let correct = 0, incorrect = 0;
+        currentQuestions.forEach(q => {
+            let uAns = userProgress[currentTopic]?.[q.id];
+            if (uAns !== undefined) {
+                if (uAns === mapAns[q.correct]) correct++;
+                else incorrect++;
+            }
+        });
+        
+        document.getElementById('stat-correct').innerText = correct;
+        document.getElementById('stat-incorrect').innerText = incorrect;
+        let score = currentQuestions.length > 0 ? (correct / currentQuestions.length) * 10 : 0;
+        document.getElementById('stat-score').innerText = score.toFixed(1);
+    }
+
+    // ==== CHỨC NĂNG THI THỬ ====
+    function startMockExam() {
+        let maxQ = dbData[currentTopic].length;
+        let numStr = prompt(`Bạn đang ở chế độ Thi Thử chuyên đề ${currentTopic}.\nNhập số lượng câu hỏi muốn làm (tối đa ${maxQ}):`, maxQ);
+        if (!numStr) return;
+        let num = parseInt(numStr);
+        if (num <= 0 || num > maxQ || isNaN(num)) { alert("Số lượng không hợp lệ!"); return; }
+
+        isMockExam = true;
+        // Trộn và lấy đủ số câu
+        let shuffled = [...dbData[currentTopic]].sort(() => 0.5 - Math.random());
+        currentQuestions = shuffled.slice(0, num);
+        
+        // Reset Progress tạm thời cho phiên thi
+        userProgress[currentTopic] = {}; 
+        
+        // Thiết lập thời gian (40s/câu)
+        examTimeLeft = num * 40; 
+        document.getElementById('timer-box').style.display = 'block';
+        document.getElementById('btn-exam').style.display = 'none';
+        document.getElementById('btn-submit').style.display = 'inline-block';
+        
+        renderQuiz();
+        
+        timerInterval = setInterval(() => {
+            examTimeLeft--;
+            let m = Math.floor(examTimeLeft / 60).toString().padStart(2, '0');
+            let s = (examTimeLeft % 60).toString().padStart(2, '0');
+            document.getElementById('timer-text').innerText = `${m}:${s}`;
+            
+            if (examTimeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert("Đã hết thời gian làm bài!");
+                submitExam();
+            }
+        }, 1000);
+    }
+
+    function submitExam() {
+        clearInterval(timerInterval);
+        isMockExam = false; // Tắt cờ thi thử để chuyển sang cơ chế chấm
+        
+        document.getElementById('timer-box').style.display = 'none';
+        document.getElementById('btn-exam').style.display = 'inline-block';
+        document.getElementById('btn-submit').style.display = 'none';
+        
+        alert("Nộp bài thành công! Hệ thống sẽ tự động chấm điểm.");
+        // Lưu tiến trình bài thi vào máy
+        localStorage.setItem('bic_progress', JSON.stringify(userProgress));
+        renderQuiz(); // Render lại với isMockExam = false để hiện đúng/sai và giải thích
+        window.scrollTo(0,0);
+    }
+
+    function endMockExam(save) {
+        clearInterval(timerInterval);
+        isMockExam = false;
+        document.getElementById('timer-box').style.display = 'none';
+        document.getElementById('btn-exam').style.display = 'inline-block';
+        document.getElementById('btn-submit').style.display = 'none';
+    }
+
+    // ==== CÁC TÍNH NĂNG PHỤ TRỢ ====
+    function shuffleQuestions() {
+        if(isMockExam) { alert("Không thể xáo trộn khi đang thi thử!"); return; }
+        currentQuestions.sort(() => 0.5 - Math.random());
+        renderQuiz();
+    }
+
+    function resetProgress() {
+        if(confirm("Bạn có chắc chắn muốn xóa toàn bộ kết quả đã làm của chuyên đề này?")) {
+            userProgress[currentTopic] = {};
+            localStorage.setItem('bic_progress', JSON.stringify(userProgress));
+            
+            // Xếp lại thứ tự gốc
+            currentQuestions = [...dbData[currentTopic]];
+            renderQuiz();
+        }
+    }
+</script>
+
+</body>
+</html>
