@@ -31,7 +31,7 @@
             cursor: pointer; 
             font-weight: bold; 
             font-size: 13px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15); 
             transition: all 0.2s;
         }
         .top-actions button:hover, .quick-actions button:hover { transform: translateY(-2px); filter: brightness(1.1); }
@@ -77,16 +77,16 @@
         #timer-box { 
             display: none; 
             background: #fff3e0; 
-            border: 2px solid #ff9800;
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            width: 150px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            border-radius: 8px;
-            padding: 15px 10px;
-            text-align: center;
+            border: 2px solid #ff9800; 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 1000; 
+            width: 150px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2); 
+            border-radius: 8px; 
+            padding: 15px 10px; 
+            text-align: center; 
         }
         #timer-box h3 { color: #e65100; font-size: 28px; margin: 0; }
         #timer-box p { margin: 5px 0 0; font-size: 12px; font-weight: bold; color: #555; text-transform: uppercase; }
@@ -215,6 +215,14 @@
         }
     }
 
+    // Hàm kiểm tra xem câu hỏi có chứa đáp án dạng tham chiếu ("A và B", "B hoặc C", "Tất cả đều đúng"...) hay không
+    function hasFixedOrderOption(options) {
+        // Biểu thức chính quy bắt các mẫu: "A và B", "B hoặc C", "A, B", "cả 2", "cả hai", "tất cả đều", "đáp án trên"
+        const fixedPattern = /\b[A-D]\s*(và|hoặc|,|&)\s*[A-D]\b|tất cả đều|cả\s*(2|hai|ba|3)\s*(ý|đáp án|phương án)|các\s*(ý|đáp án|phương án)\s*trên/i;
+        
+        return options.some(optText => fixedPattern.test(String(optText)));
+    }
+
     function initUI() {
         const tabsContainer = document.getElementById('tabs-container');
         tabsContainer.innerHTML = '';
@@ -223,14 +231,18 @@
         for (let topic in dbData) {
             if (!userProgress[topic]) userProgress[topic] = {}; 
 
-            // THUẬT TOÁN XÁO TRỘN ĐÁP ÁN ĐỘC LẬP TỪNG CÂU HỎI
+            // THUẬT TOÁN XÁO TRỘN ĐÁP ÁN TỰ ĐỘNG NHẬN DIỆN
             dbData[topic].forEach(q => {
                 let opts = q.options.map((text, i) => ({text: text, originalIdx: i}));
-                // Thuật toán Fisher-Yates xáo trộn
-                for (let i = opts.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [opts[i], opts[j]] = [opts[j], opts[i]];
+                
+                // Chỉ xáo trộn nếu câu hỏi KHÔNG chứa đáp án phụ thuộc thứ tự
+                if (!hasFixedOrderOption(q.options)) {
+                    for (let i = opts.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [opts[i], opts[j]] = [opts[j], opts[i]];
+                    }
                 }
+                
                 q.shuffledOptions = opts;
                 q.correctIdx = mapAns[q.correct];
             });
@@ -282,7 +294,7 @@
             let userAns = userProgress[currentTopic]?.[q.id];
             let correctIdx = q.correctIdx;
 
-            // Render Đáp án dựa trên mảng đã xáo trộn
+            // Render Đáp án dựa trên mảng đã xử lý
             q.shuffledOptions.forEach((optObj, displayIdx) => {
                 let letter = String.fromCharCode(65 + displayIdx); // Hiện A, B, C, D theo thứ tự hiển thị
                 let originalIdx = optObj.originalIdx;
