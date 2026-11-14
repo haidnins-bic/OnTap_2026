@@ -205,39 +205,48 @@
         }
     }
 
-    // THUẬT TOÁN XÁO TRỘN THÔNG MINH & TỰ ĐỘNG CẬP NHẬT THAM CHIẾU CHỮ CÁI
+    // THUẬT TOÁN XÁO TRỘN THÔNG MINH & RÀNG BUỘC LOGIC VỊ TRÍ
     function smartShuffleOptions(options) {
-        // Chuẩn hóa chuỗi (xóa khoảng trắng thừa/đặc biệt) và đóng gói kèm vị trí gốc
         let items = options.map((text, i) => ({
             text: String(text).replace(/\u00A0/g, ' ').trim(),
             originalIdx: i
         }));
 
-        // Nhận diện đáp án mang tính tổng kết ("Tất cả đều đúng", "Cả 3 ý trên", "Các phương án trên"...)
-        // Những câu tổng kết toàn bộ nên được ghim ở cuối (vị trí D) để giữ tính logic của câu trắc nghiệm
+        // 1. Nhận diện đáp án tổng kết toàn bộ (Tất cả đều đúng, Cả 3 ý trên...)
         const summaryPattern = /(tất cả|cả\s*(3|ba|4|bốn|các)|các)\s*(ý|đáp án|phương án|câu|trường hợp)?\s*(trên|đều|nêu trên)/i;
         
-        let normalItems = [];
-        let summaryItems = [];
+        // 2. Nhận diện đáp án tham chiếu chữ cái (A và B, (a) và (b), B hoặc C, A, B và C...)
+        const refPattern = /\(?[A-Da-d]\)?\s*(?:,|và|hoặc|&)\s*\(?[A-Da-d]\)?/i;
+
+        let normalItems = [];   // Tầng 1: Đáp án nội dung độc lập
+        let refItems = [];      // Tầng 2: Đáp án tham chiếu (chỉ được nằm sau Tầng 1)
+        let summaryItems = [];  // Tầng 3: Đáp án tổng kết (luôn nằm cuối)
 
         items.forEach(item => {
             if (summaryPattern.test(item.text)) {
                 summaryItems.push(item);
+            } else if (refPattern.test(item.text)) {
+                refItems.push(item);
             } else {
                 normalItems.push(item);
             }
         });
 
-        // Xáo trộn các đáp án thông thường (bao gồm cả các đáp án dạng "A và B", "(a) và (b)")
-        for (let i = normalItems.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [normalItems[i], normalItems[j]] = [normalItems[j], normalItems[i]];
-        }
+        // Xáo trộn độc lập từng tầng
+        const shuffleArray = (arr) => {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        };
 
-        // Ghép lại: Các đáp án thường đã đảo + Đáp án tổng kết (nếu có) nằm cuối
-        let shuffled = [...normalItems, ...summaryItems];
+        shuffleArray(normalItems);
+        shuffleArray(refItems);
 
-        // Tạo bảng ánh xạ: Chữ cái gốc (A,B,C,D) -> Chữ cái hiển thị mới (A,B,C,D)
+        // Ghép theo thứ tự logic: Độc lập (A, B...) -> Tham chiếu (C, D...) -> Tổng kết (D)
+        let shuffled = [...normalItems, ...refItems, ...summaryItems];
+
+        // Tạo bảng ánh xạ từ chữ cái gốc sang chữ cái mới
         let oldToNewLetter = {};
         shuffled.forEach((item, newIdx) => {
             let oldLetter = String.fromCharCode(65 + item.originalIdx);
@@ -245,42 +254,38 @@
             oldToNewLetter[oldLetter] = newLetter;
         });
 
-        // Quét và viết lại các cụm từ tham chiếu chữ cái (VD: "A và B", "(a) và (b)", "B hoặc C", "A, B và C")
-        const refRegex = /(\(?[A-Da-d]\)?)(?:\s*(?:,|và|hoặc|&)\s*(\(?[A-Da-d]\)?))+/g;
+        // Cập nhật lại chữ cái bên trong các đáp án tham chiếu
+        const replaceRegex = /\(?[A-Da-d]\)?(?:\s*(?:,|và|hoặc|&)\s*\(?[A-Da-d]\)?)+/g;
 
         shuffled.forEach(item => {
-            item.text = item.text.replace(refRegex, (match) => {
-                // Giữ lại dấu ngoặc đơn nếu bản gốc dùng dấu ngoặc như (a) và (b)
-                let hasParens = match.includes('(');
-                // Kiểm tra kiểu chữ hoa hay thường của bản gốc
-                let isLowerCase = /[a-d]/.test(match.replace(/và|hoặc/gi, ''));
-                
-                // Xác định từ nối gốc ("và", "hoặc", "&")
-                let connector = ' và ';
-                if (/hoặc/i.test(match)) connector = ' hoặc ';
-                else if (/&/.test(match)) connector = ' & ';
+            if (refPattern.test(item.text)) {
+                item.text = item.text.replace(replaceRegex, (match) => {
+                    let hasParens = match.includes('(');
+                    let isLowerCase = /[a-d]/.test(match.replace(/và|hoặc/gi, ''));
+                    
+                    let connector = ' và ';
+                    if (/hoặc/i.test(match)) connector = ' hoặc ';
+                    else if (/&/.test(match)) connector = ' & ';
 
-                // Trích xuất tất cả chữ cái gốc trong cụm tham chiếu
-                let rawLetters = match.match(/[A-Da-d]/g);
-                if (!rawLetters || rawLetters.length < 2) return match;
+                    let rawLetters = match.match(/[A-Da-d]/g);
+                    if (!rawLetters || rawLetters.length < 2) return match;
 
-                // Đổi sang chữ cái vị trí mới và sắp xếp lại theo thứ tự bảng chữ cái A -> B -> C -> D
-                let newLetters = rawLetters.map(l => oldToNewLetter[l.toUpperCase()]).sort();
+                    // Đổi sang chữ cái mới và sắp xếp tăng dần (A -> B -> C)
+                    let newLetters = rawLetters.map(l => oldToNewLetter[l.toUpperCase()]).sort();
 
-                // Định dạng lại chữ hoa/thường và dấu ngoặc giống hệt phong cách câu gốc
-                let formattedLetters = newLetters.map(l => {
-                    let char = isLowerCase ? l.toLowerCase() : l;
-                    return hasParens ? `(${char})` : char;
+                    let formattedLetters = newLetters.map(l => {
+                        let char = isLowerCase ? l.toLowerCase() : l;
+                        return hasParens ? `(${char})` : char;
+                    });
+
+                    if (formattedLetters.length === 2) {
+                        return `${formattedLetters[0]}${connector}${formattedLetters[1]}`;
+                    } else {
+                        let last = formattedLetters.pop();
+                        return `${formattedLetters.join(', ')}${connector}${last}`;
+                    }
                 });
-
-                // Ghép lại thành chuỗi hoàn chỉnh
-                if (formattedLetters.length === 2) {
-                    return `${formattedLetters[0]}${connector}${formattedLetters[1]}`;
-                } else {
-                    let last = formattedLetters.pop();
-                    return `${formattedLetters.join(', ')}${connector}${last}`;
-                }
-            });
+            }
         });
 
         return shuffled;
