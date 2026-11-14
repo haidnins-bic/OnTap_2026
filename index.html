@@ -38,7 +38,7 @@
         
         .quick-actions { display: flex; gap: 10px; margin: 10px 0; }
 
-        /* --- KHU VỰC TAB CHUYÊN ĐỀ (Dạng bìa hồ sơ) --- */
+        /* --- KHU VỰC TAB CHUYÊN ĐỀ --- */
         .topic-tabs { 
             display: flex; 
             gap: 4px; 
@@ -73,7 +73,7 @@
         .stat-card h3 { margin: 0; font-size: 18px; color: var(--primary); }
         .stat-card p { margin: 5px 0 0; font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; }
         
-        /* Đồng hồ đếm ngược nổi trên màn hình */
+        /* Đồng hồ đếm ngược nổi */
         #timer-box { 
             display: none; 
             background: #fff3e0; 
@@ -129,10 +129,8 @@
         <button onclick="resetProgress()" style="background: #d32f2f;">🗑 Làm lại từ đầu</button>
     </div>
 
-    <!-- TẦNG 2: THANH TAB CHUYÊN ĐỀ DÀI TRÀN MÀN HÌNH -->
-    <div class="topic-tabs" id="tabs-container">
-        <!-- Tabs render tự động từ Google Sheet sẽ nằm ở đây -->
-    </div>
+    <!-- TẦNG 2: THANH TAB CHUYÊN ĐỀ -->
+    <div class="topic-tabs" id="tabs-container"></div>
 
     <!-- Đồng hồ ghim nổi -->
     <div id="timer-box">
@@ -174,25 +172,17 @@
 </div>
 
 <script>
-    // URL Lấy dữ liệu từ Google Apps Script của bạn
     const API_URL = 'https://script.google.com/macros/s/AKfycbwjiLu4ck3TnLPttraO5ZsOH9euoIX6Vil5b4YISNmxmEKUOfd82jiLh_Qb47BtaQJ9Cg/exec';
-    
-    // Ánh xạ đáp án từ A, B, C, D sang index 0, 1, 2, 3
     const mapAns = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
     
     let dbData = {}; 
     let currentTopic = '';
     let currentQuestions = [];
-    
-    // Biến trạng thái chế độ thi thử
     let isMockExam = false;
     let timerInterval = null;
     let examTimeLeft = 0;
-
-    // LOCAL STORAGE: Lưu trữ tiến trình bằng tên gốc (bic_progress)
     let userProgress = JSON.parse(localStorage.getItem('bic_progress')) || {};
 
-    // Khởi chạy khi load trang
     window.onload = () => { fetchData(false); };
 
     async function fetchData(forceSync) {
@@ -215,12 +205,85 @@
         }
     }
 
-    // Hàm kiểm tra xem câu hỏi có chứa đáp án dạng tham chiếu ("A và B", "B hoặc C", "Tất cả đều đúng"...) hay không
-    function hasFixedOrderOption(options) {
-        // Biểu thức chính quy bắt các mẫu: "A và B", "B hoặc C", "A, B", "cả 2", "cả hai", "tất cả đều", "đáp án trên"
-        const fixedPattern = /\b[A-D]\s*(và|hoặc|,|&)\s*[A-D]\b|tất cả đều|cả\s*(2|hai|ba|3)\s*(ý|đáp án|phương án)|các\s*(ý|đáp án|phương án)\s*trên/i;
+    // THUẬT TOÁN XÁO TRỘN THÔNG MINH & TỰ ĐỘNG CẬP NHẬT THAM CHIẾU CHỮ CÁI
+    function smartShuffleOptions(options) {
+        // Chuẩn hóa chuỗi (xóa khoảng trắng thừa/đặc biệt) và đóng gói kèm vị trí gốc
+        let items = options.map((text, i) => ({
+            text: String(text).replace(/\u00A0/g, ' ').trim(),
+            originalIdx: i
+        }));
+
+        // Nhận diện đáp án mang tính tổng kết ("Tất cả đều đúng", "Cả 3 ý trên", "Các phương án trên"...)
+        // Những câu tổng kết toàn bộ nên được ghim ở cuối (vị trí D) để giữ tính logic của câu trắc nghiệm
+        const summaryPattern = /(tất cả|cả\s*(3|ba|4|bốn|các)|các)\s*(ý|đáp án|phương án|câu|trường hợp)?\s*(trên|đều|nêu trên)/i;
         
-        return options.some(optText => fixedPattern.test(String(optText)));
+        let normalItems = [];
+        let summaryItems = [];
+
+        items.forEach(item => {
+            if (summaryPattern.test(item.text)) {
+                summaryItems.push(item);
+            } else {
+                normalItems.push(item);
+            }
+        });
+
+        // Xáo trộn các đáp án thông thường (bao gồm cả các đáp án dạng "A và B", "(a) và (b)")
+        for (let i = normalItems.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [normalItems[i], normalItems[j]] = [normalItems[j], normalItems[i]];
+        }
+
+        // Ghép lại: Các đáp án thường đã đảo + Đáp án tổng kết (nếu có) nằm cuối
+        let shuffled = [...normalItems, ...summaryItems];
+
+        // Tạo bảng ánh xạ: Chữ cái gốc (A,B,C,D) -> Chữ cái hiển thị mới (A,B,C,D)
+        let oldToNewLetter = {};
+        shuffled.forEach((item, newIdx) => {
+            let oldLetter = String.fromCharCode(65 + item.originalIdx);
+            let newLetter = String.fromCharCode(65 + newIdx);
+            oldToNewLetter[oldLetter] = newLetter;
+        });
+
+        // Quét và viết lại các cụm từ tham chiếu chữ cái (VD: "A và B", "(a) và (b)", "B hoặc C", "A, B và C")
+        const refRegex = /(\(?[A-Da-d]\)?)(?:\s*(?:,|và|hoặc|&)\s*(\(?[A-Da-d]\)?))+/g;
+
+        shuffled.forEach(item => {
+            item.text = item.text.replace(refRegex, (match) => {
+                // Giữ lại dấu ngoặc đơn nếu bản gốc dùng dấu ngoặc như (a) và (b)
+                let hasParens = match.includes('(');
+                // Kiểm tra kiểu chữ hoa hay thường của bản gốc
+                let isLowerCase = /[a-d]/.test(match.replace(/và|hoặc/gi, ''));
+                
+                // Xác định từ nối gốc ("và", "hoặc", "&")
+                let connector = ' và ';
+                if (/hoặc/i.test(match)) connector = ' hoặc ';
+                else if (/&/.test(match)) connector = ' & ';
+
+                // Trích xuất tất cả chữ cái gốc trong cụm tham chiếu
+                let rawLetters = match.match(/[A-Da-d]/g);
+                if (!rawLetters || rawLetters.length < 2) return match;
+
+                // Đổi sang chữ cái vị trí mới và sắp xếp lại theo thứ tự bảng chữ cái A -> B -> C -> D
+                let newLetters = rawLetters.map(l => oldToNewLetter[l.toUpperCase()]).sort();
+
+                // Định dạng lại chữ hoa/thường và dấu ngoặc giống hệt phong cách câu gốc
+                let formattedLetters = newLetters.map(l => {
+                    let char = isLowerCase ? l.toLowerCase() : l;
+                    return hasParens ? `(${char})` : char;
+                });
+
+                // Ghép lại thành chuỗi hoàn chỉnh
+                if (formattedLetters.length === 2) {
+                    return `${formattedLetters[0]}${connector}${formattedLetters[1]}`;
+                } else {
+                    let last = formattedLetters.pop();
+                    return `${formattedLetters.join(', ')}${connector}${last}`;
+                }
+            });
+        });
+
+        return shuffled;
     }
 
     function initUI() {
@@ -231,19 +294,8 @@
         for (let topic in dbData) {
             if (!userProgress[topic]) userProgress[topic] = {}; 
 
-            // THUẬT TOÁN XÁO TRỘN ĐÁP ÁN TỰ ĐỘNG NHẬN DIỆN
             dbData[topic].forEach(q => {
-                let opts = q.options.map((text, i) => ({text: text, originalIdx: i}));
-                
-                // Chỉ xáo trộn nếu câu hỏi KHÔNG chứa đáp án phụ thuộc thứ tự
-                if (!hasFixedOrderOption(q.options)) {
-                    for (let i = opts.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [opts[i], opts[j]] = [opts[j], opts[i]];
-                    }
-                }
-                
-                q.shuffledOptions = opts;
+                q.shuffledOptions = smartShuffleOptions(q.options);
                 q.correctIdx = mapAns[q.correct];
             });
 
@@ -285,7 +337,6 @@
         document.getElementById('stat-total').innerText = currentQuestions.length;
 
         currentQuestions.forEach((q, index) => {
-            // Render Câu hỏi
             let html = `
                 <div class="q-box" id="q-${q.id}">
                     <div class="q-title">Câu ${index + 1}: ${q.question}</div>
@@ -294,9 +345,8 @@
             let userAns = userProgress[currentTopic]?.[q.id];
             let correctIdx = q.correctIdx;
 
-            // Render Đáp án dựa trên mảng đã xử lý
             q.shuffledOptions.forEach((optObj, displayIdx) => {
-                let letter = String.fromCharCode(65 + displayIdx); // Hiện A, B, C, D theo thứ tự hiển thị
+                let letter = String.fromCharCode(65 + displayIdx);
                 let originalIdx = optObj.originalIdx;
                 let optText = optObj.text;
                 
@@ -324,7 +374,6 @@
             html += `</div>`;
             container.innerHTML += html;
 
-            // Render Nav nhanh
             let navCls = '';
             if (userAns !== undefined) {
                 if (isMockExam) navCls = 'nav-selected';
@@ -341,18 +390,15 @@
         userProgress[currentTopic][qId] = selectedIdx; 
 
         if (isMockExam) {
-            // Chế độ thi thử: Đánh dấu xanh lơ, không hiện đúng sai
             const qObj = currentQuestions.find(x => x.id == qId);
             qObj.shuffledOptions.forEach(optObj => document.getElementById(`lbl-${qId}-${optObj.originalIdx}`).className = 'opt-label');
             document.getElementById(`lbl-${qId}-${selectedIdx}`).classList.add('selected');
             document.getElementById(`nav-${qId}`).className = 'nav-btn nav-selected';
         } else {
-            // Chế độ ôn tập: Chấm ngay lập tức và lưu vào biến gốc
             localStorage.setItem('bic_progress', JSON.stringify(userProgress)); 
             
             const qObj = currentQuestions.find(x => x.id == qId);
             
-            // Khóa các ô chọn & tô màu
             qObj.shuffledOptions.forEach(optObj => {
                 let originalIdx = optObj.originalIdx;
                 const lbl = document.getElementById(`lbl-${qId}-${originalIdx}`);
@@ -396,14 +442,11 @@
         if (num <= 0 || num > maxQ || isNaN(num)) { alert("Số lượng không hợp lệ!"); return; }
 
         isMockExam = true;
-        // Trộn và lấy đủ số câu
         let shuffled = [...dbData[currentTopic]].sort(() => 0.5 - Math.random());
         currentQuestions = shuffled.slice(0, num);
         
-        // Reset Progress tạm thời cho phiên thi
         userProgress[currentTopic] = {}; 
         
-        // Thiết lập thời gian (40s/câu)
         examTimeLeft = num * 40; 
         document.getElementById('timer-box').style.display = 'block';
         document.getElementById('btn-exam').style.display = 'none';
@@ -459,7 +502,6 @@
             userProgress[currentTopic] = {};
             localStorage.setItem('bic_progress', JSON.stringify(userProgress));
             
-            // Xếp lại thứ tự gốc từ cơ sở dữ liệu
             currentQuestions = [...dbData[currentTopic]];
             renderQuiz();
             window.scrollTo({ top: 0, behavior: 'smooth' });
